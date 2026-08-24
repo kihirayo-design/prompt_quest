@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>プロンプト★クエスト</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif; background: #f5f4f0; color: #1a1a1a; }
+
+  /* ===== CONFIG PANEL ===== */
+  #config-panel {
+    background: #fff;
+    border-bottom: 1px solid #e0ddd6;
+    padding: 0.6rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+  #config-panel label { color: #555; font-weight: 500; }
+  #config-panel input[type="text"], #config-panel input[type="password"] {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 13px;
+    width: 260px;
+  }
+  #config-panel input[type="text"]:focus, #config-panel input[type="password"]:focus {
+    outline: none; border-color: #7F77DD;
+  }
+  .config-saved { color: #1D9E75; font-size: 12px; display: none; }
+  .config-btn {
+    background: #7F77DD; color: white; border: none;
+    border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer;
+  }
+  .config-btn:hover { background: #534AB7; }
+  .gas-tip { color: #888; font-size: 11px; }
+
+  /* ===== LAYOUT ===== */
+  #app { max-width: 720px; margin: 0 auto; padding: 1rem; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ===== HERO ===== */
+  .hero-banner {
+    background: #1a0533;
+    border-radius: 12px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-banner::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      45deg, transparent, transparent 20px,
+      rgba(255,255,255,0.02) 20px, rgba(255,255,255,0.02) 21px
+    );
+  }
+  .hero-title { font-size: 22px; font-weight: 600; color: #e8d5ff; margin-bottom: 0.5rem; position: relative; }
+  .hero-sub { font-size: 14px; color: #9f8ab8; position: relative; }
+  .hero-icon { font-size: 48px; margin-bottom: 0.75rem; position: relative; display: block; }
+
+  /* ===== CARDS ===== */
+  .card {
+    background: #fff;
+    border: 1px solid #e5e2d9;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .card-title { font-size: 16px; font-weight: 600; color: #1a1a1a; margin-bottom: 0.75rem; }
+  .card-text { font-size: 14px; color: #555; line-height: 1.75; }
+
+  /* ===== STATUS BAR ===== */
+  .status-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 1rem;
+  }
+  .stat-card {
+    background: #fff;
+    border: 1px solid #e5e2d9;
+    border-radius: 8px;
+    padding: 0.65rem;
+    text-align: center;
+  }
+  .stat-label { font-size: 10px; color: #888; margin-bottom: 3px; }
+  .stat-value { font-size: 17px; font-weight: 600; color: #1a1a1a; }
+
+  /* ===== STAGE LIST ===== */
+  .stage-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 0.65rem 1rem;
+    border-radius: 8px; margin-bottom: 5px;
+    border: 1px solid #e5e2d9;
+    background: #fff;
+  }
+  .stage-item.done { border-color: #1D9E75; background: #E1F5EE; }
+  .stage-item.active { border: 2px solid #7F77DD; background: #EEEDFE; }
+  .stage-icon { font-size: 20px; width: 28px; text-align: center; }
+  .stage-name { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+  .stage-item.done .stage-name { color: #0F6E56; }
+  .stage-item.active .stage-name { color: #3C3489; }
+  .badge { padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: auto; }
+  .badge-done { background: #9FE1CB; color: #085041; }
+  .badge-active { background: #CECBF6; color: #26215C; }
+  .badge-locked { background: #f0ede6; color: #888; }
+
+  /* ===== HP BAR ===== */
+  .hp-bar-bg { background: #f0ede6; border-radius: 4px; height: 8px; overflow: hidden; }
+  .hp-bar { height: 8px; border-radius: 4px; transition: width 0.5s ease; }
+
+  /* ===== CHAT ===== */
+  .chat-area {
+    background: #faf9f6;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    min-height: 90px;
+    max-height: 32vh;
+    overflow-y: auto;
+  }
+  .msg { margin-bottom: 1rem; }
+  .msg:last-child { margin-bottom: 0; }
+  .msg-gm-label, .msg-player-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .msg-player { text-align: right; }
+  .msg-gm-bubble {
+    background: #fff; border: 1px solid #e5e2d9;
+    border-radius: 0 8px 8px 8px;
+    padding: 0.65rem 0.9rem; font-size: 14px; line-height: 1.7; color: #1a1a1a;
+  }
+  .msg-player-bubble {
+    display: inline-block;
+    background: #CECBF6; color: #26215C;
+    border-radius: 8px 0 8px 8px;
+    padding: 0.65rem 0.9rem; font-size: 14px; line-height: 1.7;
+    max-width: 85%; text-align: left;
+  }
+
+  /* ===== INPUT ===== */
+  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+  .prompt-input {
+    flex: 1; border: 1px solid #ccc; border-radius: 8px;
+    padding: 0.6rem 0.75rem; font-size: 14px;
+    font-family: inherit; resize: none;
+    min-height: 44px; max-height: 120px;
+    background: #fff; color: #1a1a1a;
+  }
+  .prompt-input:focus { outline: none; border-color: #7F77DD; }
+  .send-btn {
+    background: #7F77DD; color: white; border: none;
+    border-radius: 8px; padding: 0.6rem 1rem;
+    font-size: 14px; cursor: pointer; height: 44px; white-space: nowrap;
+    font-family: inherit;
+  }
+  .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .send-btn:hover:not(:disabled) { background: #534AB7; }
+
+  /* ===== LOADING ===== */
+  .loading-indicator {
+    display: none; align-items: center; gap: 8px;
+    padding: 0.5rem 0.75rem; font-size: 13px; color: #888;
+  }
+  .loading-indicator.show { display: flex; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 14px; height: 14px; border: 2px solid #ccc; border-top-color: #7F77DD; border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+  /* ===== HINT ===== */
+  .hint-box {
+    background: #EEEDFE; border: 1px solid #AFA9EC;
+    border-radius: 8px; padding: 0.75rem 1rem;
+    font-size: 13px; color: #26215C; margin-bottom: 1rem;
+  }
+  .hint-label { font-weight: 600; margin-bottom: 4px; }
+
+  /* ===== お題ボックス（目立たせる） ===== */
+  .task-box {
+    background: linear-gradient(135deg, #FFF6E5, #FFE9C7);
+    border: 2px solid #F0A93F; border-radius: 10px;
+    padding: 0.7rem 0.9rem; margin-top: 0.25rem;
+  }
+  .task-title {
+    font-size: 16px; font-weight: 800; color: #8A4B00;
+    line-height: 1.4; margin-bottom: 6px;
+  }
+  .task-body {
+    font-size: 13.5px; color: #4a3b22; line-height: 1.65;
+    white-space: pre-wrap;
+  }
+
+  /* ===== INVENTORY ===== */
+  .inventory { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0.5rem; }
+  .item-badge {
+    background: #FAC775; color: #412402;
+    border: 1px solid #E0A93F; border-radius: 20px; padding: 6px 14px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: transform .1s, box-shadow .1s;
+  }
+  .item-badge:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,.18); background: #FFD587; }
+  .item-badge:active { transform: translateY(0); }
+
+  /* ===== WELCOME ===== */
+  .name-input {
+    width: 100%; border: 1px solid #ccc; border-radius: 8px;
+    padding: 0.75rem 1rem; font-size: 16px;
+    font-family: inherit; background: #fff; color: #1a1a1a;
+    margin-bottom: 0.75rem; display: block;
+  }
+  .name-input:focus { outline: none; border-color: #7F77DD; }
+  .class-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 1rem; }
+  .class-btn {
+    background: #fff; border: 1px solid #e5e2d9;
+    border-radius: 8px; padding: 0.75rem; text-align: left;
+    cursor: pointer; transition: border-color 0.15s; font-family: inherit;
+  }
+  .class-btn:hover { border-color: #7F77DD; }
+  .class-btn.selected { border: 2px solid #7F77DD; background: #EEEDFE; }
+  .class-btn-icon { font-size: 24px; margin-bottom: 4px; }
+  .class-btn-name { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+  .class-btn-desc { font-size: 12px; color: #888; }
+  .start-btn {
+    width: 100%; background: #7F77DD; color: white; border: none;
+    border-radius: 10px; padding: 0.85rem; font-size: 16px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .start-btn:hover { background: #534AB7; }
+  .start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ===== SCORE SCREEN ===== */
+  .score-display { text-align: center; padding: 1.5rem; }
+  .score-number { font-size: 72px; font-weight: 700; color: #7F77DD; }
+  .score-row {
+    display: flex; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid #e5e2d9;
+    font-size: 14px;
+  }
+  .score-row:last-child { border-bottom: none; }
+  .score-bar-bg { background: #f0ede6; border-radius: 4px; height: 6px; flex: 1; margin: 0 12px; align-self: center; overflow: hidden; }
+  .score-bar { height: 6px; border-radius: 4px; background: #7F77DD; }
+
+  /* ===== REPORT BUTTONS ===== */
+  .action-row { display: flex; gap: 8px; margin-top: 0.5rem; flex-wrap: wrap; }
+  .action-btn {
+    flex: 1; min-width: 140px; padding: 0.7rem 1rem;
+    border-radius: 8px; font-size: 14px; font-weight: 600;
+    cursor: pointer; border: none; font-family: inherit;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn-print { background: #f0ede6; color: #333; }
+  .btn-print:hover { background: #e0ddd6; }
+  .btn-sheet { background: #1D9E75; color: white; }
+  .btn-sheet:hover { background: #0F6E56; }
+  .btn-restart { background: #7F77DD; color: white; }
+  .btn-restart:hover { background: #534AB7; }
+  .status-msg { font-size: 13px; padding: 0.5rem 0.75rem; border-radius: 6px; margin-top: 0.5rem; display: none; }
+  .status-msg.show { display: block; }
+  .status-msg.success { background: #E1F5EE; color: #0F6E56; }
+  .status-msg.error { background: #FCEBEB; color: #A32D2D; }
+
+  /* ===== PRINT STYLES ===== */
+  @media print {
+    #config-panel, .input-row, #inventory-card, #midway-submit-card, .action-row,
+    .stage-list, .hint-box, .loading-indicator { display: none !important; }
+    body { background: white; }
+    .hero-banner { background: #1a0533 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .card { break-inside: avoid; }
+    #screen-score.active { display: block !important; }
+    #screen-game { display: none !important; }
+    .score-bar { background: #7F77DD !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== CONFIG BAR (教師設定) ===== -->
+<div id="config-panel">
+  <label>⚙️ 先生用設定：</label>
+  <label>GoogleフォームURL</label>
+  <input type="text" id="cfg-form-url" placeholder="https://docs.google.com/forms/d/e/.../viewform" style="width:300px;" />
+  <label>Gemini APIキー（任意）</label>
+  <input type="password" id="cfg-gemini-key" placeholder="AIza...（空ならルール採点）" style="width:180px;" />
+  <button class="config-btn" onclick="saveConfig()">保存</button>
+  <span class="config-saved" id="config-saved-msg">✓ 保存済み</span>
+  <span class="gas-tip">※フォームURLは必須。APIキーを入れるとGeminiが対話で評価します（空・エラー時は自動でルール採点に切替）</span>
+</div>
+
+<div id="app">
+
+  <!-- ===== WELCOME SCREEN ===== -->
+  <div id="screen-welcome" class="screen active">
+    <div class="hero-banner">
+      <span class="hero-icon">🏰</span>
+      <div class="hero-title">プロンプト★クエスト</div>
+      <div class="hero-sub">言葉の力で世界を変える冒険へ</div>
+    </div>
+    <div class="card">
+      <div class="card-title">⚔️ ようこそ、若き勇者よ</div>
+      <p class="card-text">
+        ここは <strong>『言葉（プロンプト）』が世界を創り、魔法となる世界</strong> だ。<br><br>
+        AIという強大な魔力を自在に操り、<strong>志望理由書</strong>を完成させる冒険に出よう。<br>
+        7体の魔物を倒すたびに、AIへの上手な頼み方のコツが1つずつ身につく。最後は伝説の <strong>カオス・ドラゴン</strong> を全技術で打ち倒すのだ！
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-title">📝 プレイヤー情報の入力</div>
+      <label style="font-size:13px; color:#555; display:block; margin-bottom:4px;">クラス・出席番号（例：1215）</label>
+      <input id="player-class-input" class="name-input" type="text" placeholder="クラスと出席番号を入力してください" maxlength="30" />
+      <label style="font-size:13px; color:#555; display:block; margin-bottom:4px;">プレイヤー名（冒険者名）</label>
+      <input id="player-name-input" class="name-input" type="text" placeholder="名前を入力（例：ルーン、勇者タロウ）" maxlength="20" />
+
+      <label style="font-size:13px; color:#555; display:block; margin-bottom:8px; font-weight:600;">🛤️ あなたの進路コースを選ぼう（志望理由書のテーマが変わります）</label>
+      <div class="class-grid">
+        <button class="class-btn selected" onclick="selectCourse(this,'進学','🎓')" data-course="進学" data-icon="🎓">
+          <div class="class-btn-icon">🎓</div>
+          <div class="class-btn-name">進学コース</div>
+          <div class="class-btn-desc">大学・専門学校の志望理由書</div>
+        </button>
+        <button class="class-btn" onclick="selectCourse(this,'就職','💼')" data-course="就職" data-icon="💼">
+          <div class="class-btn-icon">💼</div>
+          <div class="class-btn-name">就職コース</div>
+          <div class="class-btn-desc">就職・採用の志望理由書（ES）</div>
+        </button>
+      </div>
+
+      <label style="font-size:13px; color:#555; display:block; margin-bottom:8px;">⚔️ 職業クラスを選ぼう（見た目だけ・好みでOK）</label>
+      <div class="class-grid">
+        <button class="class-btn selected" onclick="selectClass(this,'魔法使い','🧙')" data-class="魔法使い" data-icon="🧙">
+          <div class="class-btn-icon">🧙</div>
+          <div class="class-btn-name">魔法使い</div>
+          <div class="class-btn-desc">言葉の力を極める者</div>
+        </button>
+        <button class="class-btn" onclick="selectClass(this,'戦士','⚔️')" data-class="戦士" data-icon="⚔️">
+          <div class="class-btn-icon">⚔️</div>
+          <div class="class-btn-name">戦士</div>
+          <div class="class-btn-desc">直球勝負の挑戦者</div>
+        </button>
+        <button class="class-btn" onclick="selectClass(this,'賢者','📚')" data-class="賢者" data-icon="📚">
+          <div class="class-btn-icon">📚</div>
+          <div class="class-btn-name">賢者</div>
+          <div class="class-btn-desc">論理と知識の探求者</div>
+        </button>
+        <button class="class-btn" onclick="selectClass(this,'吟遊詩人','🎵')" data-class="吟遊詩人" data-icon="🎵">
+          <div class="class-btn-icon">🎵</div>
+          <div class="class-btn-name">吟遊詩人</div>
+          <div class="class-btn-desc">創造と表現の達人</div>
+        </button>
+      </div>
+      <button class="start-btn" id="start-btn" onclick="startAdventure()">⚔️ 冒険を始める！</button>
+    </div>
+  </div>
+
+  <!-- ===== GAME SCREEN ===== -->
+  <div id="screen-game" class="screen">
+    <div class="status-bar">
+      <div class="stat-card">
+        <div class="stat-label">勇者</div>
+        <div class="stat-value" id="stat-name" style="font-size:13px;">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">レベル</div>
+        <div class="stat-value" id="stat-level">1</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">ステージ</div>
+        <div class="stat-value" id="stat-stage">1/7</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">試行回数</div>
+        <div class="stat-value" id="stat-tries">0</div>
+      </div>
+    </div>
+
+    <details id="stage-list-details" style="margin-bottom:0.75rem;">
+      <summary style="cursor:pointer; font-size:13px; font-weight:600; color:#7F77DD; padding:4px 0;">🗺️ 冒険マップ（全7ステージ）を表示</summary>
+      <div id="stage-list" class="stage-list" style="margin-top:0.5rem;"></div>
+    </details>
+
+    <!-- 敵＋お題（戦う相手） -->
+    <div class="card" id="enemy-card" style="margin-bottom:0.75rem;">
+      <div id="enemy-info"></div>
+    </div>
+
+    <!-- 詠唱（プロンプト入力）：敵のすぐ下で同時に見えるように -->
+    <div class="card" style="padding-bottom: 0.75rem;">
+      <div class="card-title">📜 魔法の詠唱（プロンプトを入力）</div>
+      <div class="chat-area" id="chat-area"></div>
+      <div class="loading-indicator" id="loading">
+        <div class="spinner"></div>
+        <span>ゲームマスターが評価中…</span>
+      </div>
+      <div class="input-row">
+        <textarea id="prompt-input" class="prompt-input" placeholder="ここにプロンプトを書こう…（Shift+Enterで改行）" rows="2"></textarea>
+        <button id="send-btn" class="send-btn" onclick="sendMessage()">詠唱 ✨</button>
+      </div>
+    </div>
+
+    <div class="hint-box" id="hint-box">
+      <div class="hint-label">💡 ワンポイント</div>
+      <div id="hint-text"></div>
+    </div>
+
+    <div class="card" id="inventory-card">
+      <div class="card-title">🎒 所持アイテム（獲得したプロンプト技術）</div>
+      <div class="inventory" id="inventory-list">
+        <span style="font-size:13px; color:#888;">まだアイテムなし</span>
+      </div>
+    </div>
+
+    <!-- ★ 途中提出エリア（ラスボス撃破前でも提出できる） -->
+    <div class="card" id="midway-submit-card" style="border: 2px solid #1D9E75; background: #E1F5EE;">
+      <div class="card-title" style="color:#0F6E56;">📤 ここまでの結果を先生へ提出する</div>
+      <p style="font-size:13px; color:#555; margin-bottom:0.75rem;">
+        最後までクリアできなくても、<strong>今この瞬間まで</strong>の結果（組席・なまえ・コース・点数・プロンプト履歴）を提出できます。
+      </p>
+      <textarea id="midway-text" readonly
+        style="width:100%; min-height:90px; font-size:12px; font-family:monospace;
+               border:1px solid #AFA9EC; border-radius:8px; padding:0.6rem;
+               background:#fff; color:#333; resize:vertical; margin-bottom:0.5rem;"></textarea>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="action-btn btn-sheet" id="midway-copy-btn" onclick="copyResult('midway')"
+          style="flex:1; min-width:150px; font-size:14px; padding:0.7rem; border-radius:10px;">
+          📋 ①結果をコピー
+        </button>
+        <button class="action-btn btn-restart" id="midway-form-btn" onclick="openForm('midway')"
+          style="flex:1; min-width:150px; font-size:14px; padding:0.7rem; border-radius:10px;">
+          📝 ②Googleフォームを開く
+        </button>
+      </div>
+      <div class="status-msg" id="midway-status"></div>
+      <p style="font-size:12px; color:#888; margin-top:0.5rem;">
+        ※「①結果をコピー」を押すと最新の状態がコピーされます。その後「②Googleフォームを開く」で貼り付け（Ctrl+V）して送信してください。
+      </p>
+    </div>
+  </div>
+
+  <!-- ===== SCORE SCREEN ===== -->
+  <div id="screen-score" class="screen">
+    <div class="hero-banner">
+      <span class="hero-icon" id="ending-icon">🐉</span>
+      <div class="hero-title" id="ending-title">冒険の結末</div>
+      <div class="hero-sub" id="ending-sub">—</div>
+    </div>
+
+    <!-- プレイヤー情報（印刷で見える） -->
+    <div class="card" id="player-info-card">
+      <div class="card-title">📋 プレイヤー情報</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:14px;">
+        <div><span style="color:#888;">クラス・出席番号：</span><strong id="print-class">—</strong></div>
+        <div><span style="color:#888;">プレイヤー名：</span><strong id="print-name">—</strong></div>
+        <div><span style="color:#888;">職業：</span><strong id="print-class-type">—</strong></div>
+        <div><span style="color:#888;">挑戦日時：</span><strong id="print-datetime">—</strong></div>
+        <div><span style="color:#888;">総試行回数：</span><strong id="print-tries">—</strong></div>
+        <div><span style="color:#888;">クリアステージ：</span><strong id="print-stages">—</strong></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="score-display">
+        <div style="font-size:13px; color:#888; margin-bottom:0.5rem;">最終スコア</div>
+        <div class="score-number" id="final-score">0</div>
+        <div style="font-size:13px; color:#888;">/ 100点</div>
+      </div>
+      <div id="score-breakdown" style="margin-top:1rem;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📖 エンディング</div>
+      <p class="card-text" id="ending-story"></p>
+    </div>
+
+    <!-- 各ステージの詠唱ログ -->
+    <div class="card" id="stage-log-card">
+      <div class="card-title">📜 ステージ別プロンプトログ</div>
+      <div id="stage-log-content" style="font-size:13px; color:#555; line-height:1.8;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎓 学びのまとめ — AIを使いこなす6つのコツ</div>
+      <p class="card-text">
+        ✅ <strong>①明確な指示</strong>：「〜してください」と動詞ではっきり頼む<br>
+        ✅ <strong>②条件・制約</strong>：文字数・個数・対象・入れたい言葉などを足す<br>
+        ✅ <strong>③役割と振る舞い</strong>：「あなたは〇〇です」＋守ってほしいルールを与える<br>
+        ✅ <strong>④情報を与える</strong>：自分の経験・性格・強みなど具体的な材料を渡す<br>
+        ✅ <strong>⑤形式・文字数</strong>：「400字以内で」「箇条書きで」など形を指定する<br>
+        ✅ <strong>⑥AIリテラシー</strong>：個人情報を入れない・嘘や代筆をしない・自分の言葉に直す<br>
+        <span style="color:#7F77DD;">→ 最後はこの6つを1つにまとめて、志望理由書プロンプトを完成！</span>
+      </p>
+    </div>
+
+    <!-- ★ 提出エリア（コピー → Googleフォーム貼り付け） -->
+    <div class="card" style="border: 2px solid #1D9E75; background: #E1F5EE;">
+      <div class="card-title" style="color:#0F6E56;">📤 先生へ結果を提出する</div>
+      <p style="font-size:13px; color:#555; margin-bottom:0.75rem;">
+        以下の2ステップで提出します。提出内容は<strong>組席・名前・点数・プロンプト履歴</strong>です。
+      </p>
+
+      <!-- 提出用テキスト（自動生成・コピー対象） -->
+      <textarea id="submit-text" readonly
+        style="width:100%; min-height:120px; font-size:12px; font-family:monospace;
+               border:1px solid #AFA9EC; border-radius:8px; padding:0.6rem;
+               background:#fff; color:#333; resize:vertical; margin-bottom:0.5rem;"></textarea>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="action-btn btn-sheet" id="copy-btn" onclick="copyResult('final')"
+          style="flex:1; min-width:160px; font-size:15px; padding:0.8rem; border-radius:10px;">
+          📋 ①結果をコピー
+        </button>
+        <button class="action-btn btn-restart" id="form-btn" onclick="openForm('final')"
+          style="flex:1; min-width:160px; font-size:15px; padding:0.8rem; border-radius:10px;">
+          📝 ②Googleフォームを開く
+        </button>
+      </div>
+      <div class="status-msg" id="sheet-status"></div>
+      <p style="font-size:12px; color:#888; margin-top:0.5rem;">
+        ※「①結果をコピー」を押した後、「②Googleフォームを開く」でフォームを開き、回答欄に貼り付け（Ctrl+V）して送信してください。
+      </p>
+    </div>
+
+    <div class="action-row">
+      <button class="action-btn btn-print" onclick="window.print()">🖨️ 印刷・PDF保存</button>
+      <button class="action-btn btn-restart" onclick="restartGame()">🔄 もう一度挑戦</button>
+    </div>
+  </div>
+
+</div><!-- /#app -->
+
+<script>
+// ===== CONFIG =====
+function saveConfig() {
+  const url = document.getElementById('cfg-form-url').value.trim();
+  if (url) localStorage.setItem('form_url', url);
+  const key = document.getElementById('cfg-gemini-key').value.trim();
+  // キーは空にもできる（空＝ルール採点に戻す）
+  if (key) localStorage.setItem('gemini_key', key);
+  else localStorage.removeItem('gemini_key');
+  const msg = document.getElementById('config-saved-msg');
+  msg.style.display = 'inline';
+  setTimeout(() => msg.style.display = 'none', 2000);
+}
+function loadConfig() {
+  const url = localStorage.getItem('form_url') || '';
+  if (url) document.getElementById('cfg-form-url').value = url;
+  const key = localStorage.getItem('gemini_key') || '';
+  if (key) document.getElementById('cfg-gemini-key').value = key;
+}
+// ★★★ 先生がここにGoogleフォームのURL／APIキーを直接書いてもOK（配布用に固定したい場合）★★★
+const HARDCODED_FORM_URL = '';   // 例: 'https://docs.google.com/forms/d/e/.../viewform'
+const HARDCODED_GEMINI_KEY = ''; // 例: 'AIzaSy...'（空ならルール採点）
+function getFormUrl()   { return HARDCODED_FORM_URL   || (document.getElementById('cfg-form-url')   ? document.getElementById('cfg-form-url').value.trim()   : '') || localStorage.getItem('form_url')   || ''; }
+function getGeminiKey() { return HARDCODED_GEMINI_KEY || (document.getElementById('cfg-gemini-key') ? document.getElementById('cfg-gemini-key').value.trim() : '') || localStorage.getItem('gemini_key') || ''; }
+
+// ===== DATA =====
+// ===== 7ステージ構成 =====
+// ステージ1〜6は身近なお題でコツを体得、ステージ7（ボス）で志望理由書に統合。
+// 各ステージに reward（巻物アイテム名）と scroll（タップで読めるコツ）を持たせる。
+const STAGES = [
+  { id:1, name:"スライム討伐",       sub:"明確な指示",        icon:"🟢", enemy:"スライム",         hp:100,
+    reward:"指示の巻物",   rewardIcon:"📜",
+    scroll:"【指示の巻物 📜｜明確な指示】\nAIには“何をしてほしいか”を動詞ではっきり伝えよう。\n\n❌「カレーについて」→ 何をしてほしいか不明\n✅「カレーの作り方を3ステップで説明してください」\n\n💡 型：『〜を／〜について、◯◯してください』\n（説明して／挙げて／提案して／比べて など）" },
+  { id:2, name:"ゴブリンの群れ",      sub:"条件・制約",        icon:"👺", enemy:"ゴブリン",         hp:130,
+    reward:"制約の盾",     rewardIcon:"🛡️",
+    scroll:"【制約の盾 🛡️｜条件・制約】\n条件を足すほどAIの出力を思い通りにコントロールできる。\n\n✅ 足せる条件：\n・文字数（20字以内で）\n・対象（他校の高校生向けに）\n・個数（3パターン出して）\n・雰囲気/語（『サクふわ』を入れて）\n\n💡 型：『◯◯してください。ただし、△△という条件で。』" },
+  { id:3, name:"迷宮のガーディアン",  sub:"役割と振る舞い",    icon:"🛡️", enemy:"ガーディアン",     hp:170,
+    reward:"変幻の外套",   rewardIcon:"🧥",
+    scroll:"【変幻の外套 🧥｜役割と振る舞い】\nAIに“肩書き”と“振る舞いのルール”を与えると別人のように賢くなる。\n\n✅ 役割：「あなたは優しい予備校講師です」\n✅ 振る舞い：「私が答えを言うまで、絶対に正解を直接教えないでください」\n\n💡 型：『あなたは〜です。〜のように振る舞ってください。』" },
+  { id:4, name:"ダークメイジ",        sub:"情報を与える",      icon:"🔮", enemy:"ダークメイジ",     hp:200,
+    reward:"自己分析の鏡", rewardIcon:"🪞",
+    scroll:"【自己分析の鏡 🪞｜情報を与える】\nAIはあなたを知らない。具体的な“材料”を渡すほど答えが自分専用になる。\n\n✅ 渡す材料：経験・エピソード・長所・短所・がんばったこと\n❌「自己PRを書いて」→ ありきたり\n✅「私は3年間バスケ部で副キャプテンを務め…という経験があります」\n\n💡 型：『私は〜です（具体的な事実）。これをもとに◯◯してください。』" },
+  { id:5, name:"フロストワイバーン",  sub:"形式・文字数",      icon:"🐲", enemy:"ワイバーン",       hp:230,
+    reward:"形の杖",       rewardIcon:"🪄",
+    scroll:"【形の杖 🪄｜形式・文字数】\n出力の“形”を指定すると、そのまま使える回答になる。\n\n✅ 文字数：「200字以内で」\n✅ 形式：「箇条書きで」「序論・本論・結論で」「表で」\n✅ 文体：「ですます調で」\n\n💡 型：『◯◯字以内で、△△の形式で、□□してください。』" },
+  { id:6, name:"アンデッド・リッチ",  sub:"AIリテラシー",      icon:"💀", enemy:"リッチ",           hp:200,
+    reward:"真実の光",     rewardIcon:"🔆",
+    scroll:"【真実の光 🔆｜AIリテラシー・安全性】\nAIを安全に使うための“禁忌”を守ろう。\n\n🚫 本名・住所・電話番号など個人情報を入れない（ダミーや抽象化を使う）\n🚫 嘘や代筆をさせない・丸写ししない\n✅ AIの文章はそのまま出さず、必ず自分の言葉に直す\n\n💡 型：『個人情報は入れず、私自身が書くための助言をください。』" },
+  { id:7, name:"カオス・ドラゴン",    sub:"総合力の証明",      icon:"🐉", enemy:"カオス・ドラゴン", hp:600,
+    reward:"伝説の志望理由書", rewardIcon:"🏆",
+    scroll:"【伝説の知恵 🏆｜総合】\n学んだ6つの力を1つのプロンプトに結集させよ。\n①明確な指示 ②条件 ③役割 ④自分の情報 ⑤形式・文字数 ⑥安全配慮" }
+];
+
+// ステージ1〜6は共通の身近お題（コース非依存）。ステージ7のみコース別。
+const COMMON_TASKS = [
+  "【ステージ1️⃣ 明確な指示｜お題：好きな食べ物】\nまずは練習。AIに“何をしてほしいか”を動詞ではっきり伝えよう。\n\n🎯 お題：あなたの好きな食べ物の「紹介文」をAIに書いてもらおう。\n\n❌ 悪い例：「ラーメンについて」\n✅ 例：「ラーメンの魅力を友達にすすめる紹介文として書いてください」",
+  "【ステージ2️⃣ 条件・制約｜お題：文化祭の模擬店】\n条件を足してAIの出力をコントロールしよう。\n\n🎯 お題：クラスの模擬店（チュロス・お化け屋敷など何でもOK）に\nお客さんを呼ぶ「キャッチコピー」をAIに作らせよう。\n\n✅ 例：「お化け屋敷のキャッチコピーを、20字以内で、3パターン、『ゾクッ』という言葉を入れて作ってください」\n\n💬 壁打ちのAIが、条件が足りないと教えてくれるよ。",
+  "【ステージ3️⃣ 役割と振る舞い｜お題：答えを教えない家庭教師】\nAIに役割と“振る舞いのルール”を与えよう。\n\n🎯 お題：苦手な科目を教わる「家庭教師」をAIに演じさせよう。\nただし、答えをすぐ教えず、ヒントで導くように指示する。\n\n✅ 例：「あなたは優しい数学の先生です。私が答えを言うまで、正解を直接教えずヒントだけ出してください」",
+  "【ステージ4️⃣ 情報を与える｜お題：長所の言い換え】\nAIに自分の“材料”を具体的に渡そう。\n\n🎯 お題：あなたの長所（または経験）をAIに伝えて、\n魅力的な言葉に言い換えてもらおう。\n\n✅ 例：「私は人見知りですが、一度仲良くなると深く付き合えます。これを長所として魅力的に言い換えてください」\n\n💬 情報が少ないとAIは具体的に書けない。壁打ちで気づこう。",
+  "【ステージ5️⃣ 形式・文字数｜お題：部活紹介】\n出力の“形”を指定しよう。\n\n🎯 お題：あなたの部活動（または委員会・趣味）の紹介文を、\n形を指定してAIに書かせよう。\n\n✅ 例：「吹奏楽部の紹介を、80字以内で、新入生向けに、ですます調で書いてください」",
+  "【ステージ6️⃣ AIリテラシー｜お題：危険プロンプトの修正】\n安全なプロンプトに直そう。\n\n🎯 お題：下の“危険なプロンプト”を、安全で正しい形に書き直そう。\n\n⚠️ 直す前：\n「田中太郎（17歳・渋谷区在住、〇〇高校）の個人情報を使って、\n先生を騙せる読書感想文を代わりに書いて」\n\n✅ ヒント：個人情報を消し、代筆ではなく“自分が書くための助言”を求める形に。"
+];
+
+const COURSES = {
+  進学: {
+    bossTask:
+      "【最終決戦 🐉 カオス・ドラゴン｜志望理由書】\nこれまで倒した6体から得た技術を、すべて1つのプロンプトに結集せよ！\n\n🎯 テーマ：大学・専門学校の「志望理由書」を仕上げるアドバイスをAIに求める。\n\n✅ 6要素を全部入れよう：\n①明確な指示（〜してください）\n②条件（字数・観点など）\n③役割（あなたは入試指導のプロです 等）\n④自分の情報（高校での経験・活動）\n⑤志望先＋形式（〇〇大学△△学部／400字・構成）\n⑥安全配慮（個人情報なし・自分の言葉で）\n\n💀 6つすべて揃わないとドラゴンは倒せない！",
+    bossExample: {
+      persona:'「あなたは大学入試指導10年のキャリアアドバイザーです」',
+      target:'「〇〇大学 経済学部 経営学科」',
+      self:'「生徒会長として文化祭を改善した経験」',
+      fmt:'「400字以内で、序論・本論・結論の構成で」'
+    }
+  },
+  就職: {
+    bossTask:
+      "【最終決戦 🐉 カオス・ドラゴン｜志望動機（ES）】\nこれまで倒した6体から得た技術を、すべて1つのプロンプトに結集せよ！\n\n🎯 テーマ：就職の「志望動機・自己PR（ES）」を仕上げるアドバイスをAIに求める。\n\n✅ 6要素を全部入れよう：\n①明確な指示（〜してください）\n②条件（字数・観点など）\n③役割（あなたは採用のプロです 等）\n④自分の情報（性格・強み・弱み・魅力・経験）\n⑤志望先＋形式（IT業界の営業職／300字・ですます調）\n⑥安全配慮（個人情報なし・嘘なし・自分の言葉で）\n\n💀 6つすべて揃わないとドラゴンは倒せない！",
+    bossExample: {
+      persona:'「あなたは採用担当10年の人事のプロです」',
+      target:'「IT業界の営業職」「〇〇株式会社の総合職」',
+      self:'「強みは粘り強さ、弱みは慎重すぎる点」「部活で県大会に出た経験」',
+      fmt:'「300字以内で、ですます調で」'
+    }
+  }
+};
+
+// 現在のステージの課題文を返す（1〜6共通、7はコース別）
+function curTask(stage) {
+  if (stage <= 6) return COMMON_TASKS[stage-1];
+  return COURSES[state.course].bossTask;
+}
+// ステージ中の軽い方向づけヒント（詳しいコツは獲得した巻物から読む）
+const SOFT_HINTS = [
+  "💡 AIに“何をしてほしいか”を動詞で書こう（説明して／挙げて など）。",
+  "💡 条件を足してみよう（文字数・個数・対象・入れたい言葉 など）。",
+  "💡 AIに役割（肩書き）と、守ってほしいルールを与えよう。",
+  "💡 あなた自身の具体的な情報・経験をAIに渡そう。",
+  "💡 文字数・形式・文体など“出力の形”を指定しよう。",
+  "💡 個人情報を入れず、代筆ではなく“自分が書くための助言”を求めよう。",
+  "💡 学んだ6つの力を1つのプロンプトに全部入れよう！（足りないと倒せない）"
+];
+function curHint(stage) { return SOFT_HINTS[stage-1]; }
+
+let state = {
+  playerName: '', playerClass: '', playerClassIcon: '🧙', playerClassType: '魔法使い',
+  course: '進学',  // '進学' or '就職'
+  courseIcon: '🎓',
+  currentStage: 1, level: 1, inventory: [], totalTries: 0,
+  enemyHp: 100, enemyMaxHp: 100,
+  stagePromptLogs: [],   // [{stage, prompt, feedback, passed}]
+  waitingForResponse: false,
+  finalResult: null
+};
+
+// ===== COURSE SELECTION（進学/就職） =====
+function selectCourse(btn, course, icon) {
+  document.querySelectorAll('.class-btn[data-course]').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.course = course;
+  state.courseIcon = icon;
+}
+
+// ===== CLASS SELECTION（見た目の職業） =====
+function selectClass(btn, cls, icon) {
+  document.querySelectorAll('.class-btn[data-class]').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.playerClassType = cls;
+  state.playerClassIcon = icon;
+}
+
+// ===== START =====
+function startAdventure() {
+  const playerClass = document.getElementById('player-class-input').value.trim();
+  const name = document.getElementById('player-name-input').value.trim();
+  if (!playerClass) { alert('クラス・出席番号を入力してください！'); return; }
+  if (!name) { alert('プレイヤー名を入力してください！'); return; }
+  state.playerName = name;
+  state.playerClass = playerClass;
+  state.enemyHp = STAGES[0].hp;
+  state.enemyMaxHp = STAGES[0].hp;
+
+  document.getElementById('screen-welcome').classList.remove('active');
+  document.getElementById('screen-game').classList.add('active');
+  document.getElementById('stat-name').textContent = name;
+
+  renderStages();
+  renderEnemyCard();
+  document.getElementById('hint-text').textContent = curHint(1);
+  const mt0 = document.getElementById('midway-text');
+  if (mt0) mt0.value = buildSubmitText('midway');
+
+  const courseLabel = state.course === '進学' ? '大学・専門学校の志望理由書' : '就職の志望動機（ES）';
+  addMessage('gm', `${state.playerClassIcon} ${name}（${state.playerClassType}）よ、冒険を始めよう！\n\n🛤️ あなたが選んだのは「${state.courseIcon} ${state.course}コース」。最後のボス戦で、${courseLabel}を完成させるのが目的だ。\n\nそこに至るまで、身近なお題（好きな食べ物・文化祭・部活など）で、AIへの上手な頼み方のコツを1つずつ身につけていく。倒した魔物からは「コツの巻物」がもらえる。詰まったら巻物を読み返そう！\n\nまず目の前には 🟢 スライム。お題は「好きな食べ物の紹介文」。明確な指示でスライムを倒せ！\n下にプロンプトを書いて「詠唱 ✨」を押してみよう。`);
+}
+
+// ===== RENDER STAGES =====
+function renderStages() {
+  document.getElementById('stage-list').innerHTML = STAGES.map(s => {
+    let cls = '', badge = `<span class="badge badge-locked">未挑戦</span>`;
+    if (s.id < state.currentStage)       { cls = 'done';   badge = `<span class="badge badge-done">✓ クリア</span>`; }
+    else if (s.id === state.currentStage) { cls = 'active'; badge = `<span class="badge badge-active">挑戦中</span>`; }
+    return `<div class="stage-item ${cls}">
+      <span class="stage-icon">${s.icon}</span>
+      <div><div class="stage-name">ステージ${s.id}：${s.name}</div>
+      <div style="font-size:11px;color:#888;">${s.sub}</div></div>
+      ${badge}
+    </div>`;
+  }).join('');
+}
+
+// ===== RENDER ENEMY =====
+function renderEnemyCard() {
+  const s = STAGES[state.currentStage - 1];
+  const pct = Math.max(0, Math.round(state.enemyHp / state.enemyMaxHp * 100));
+  const col = pct > 60 ? '#1D9E75' : pct > 30 ? '#EF9F27' : '#E24B4A';
+
+  // お題テキストを「見出し行」と「本文」に分割して、見出しを大きく表示
+  const taskRaw = curTask(state.currentStage);
+  const lines = taskRaw.split('\n');
+  const taskTitle = lines[0].replace(/^【|】$/g,'');           // 1行目＝見出し
+  const taskBody  = lines.slice(1).join('\n').trim();          // 残り＝本文
+
+  document.getElementById('enemy-info').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.5rem;">
+      <span style="font-size:30px;">${s.icon}</span>
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:700;">${s.enemy}</div>
+        <div style="font-size:11px;color:#888;margin-bottom:3px;">HP: ${Math.max(0,state.enemyHp)} / ${state.enemyMaxHp}</div>
+        <div class="hp-bar-bg"><div class="hp-bar" style="width:${pct}%;background:${col};"></div></div>
+      </div>
+    </div>
+    <div class="task-box">
+      <div class="task-title">🎯 ${taskTitle}</div>
+      <div class="task-body">${taskBody}</div>
+    </div>
+  `;
+}
+
+// ===== CHAT =====
+function addMessage(role, text) {
+  const area = document.getElementById('chat-area');
+  const div = document.createElement('div');
+  div.className = 'msg';
+  const html = text.replace(/\n/g, '<br>');
+  if (role === 'gm') {
+    div.innerHTML = `<div class="msg-gm-label">🎲 ゲームマスター</div><div class="msg-gm-bubble">${html}</div>`;
+  } else {
+    div.innerHTML = `<div class="msg-player-label" style="text-align:right;">${state.playerClassIcon} ${state.playerName}</div><div class="msg-player-bubble">${html}</div>`;
+  }
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+// ===== SEND MESSAGE =====
+async function sendMessage() {
+  if (state.waitingForResponse) return;
+  const input = document.getElementById('prompt-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  state.totalTries++;
+  document.getElementById('stat-tries').textContent = state.totalTries;
+  addMessage('player', text);
+
+  state.waitingForResponse = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('loading').classList.add('show');
+
+  // ハイブリッド採点：APIキーがあればGeminiで評価、なければ/失敗時はルールベース
+  let result;
+  const apiKey = getGeminiKey();
+  if (apiKey) {
+    const gem = await gradeWithGemini(text, state.currentStage, apiKey);
+    if (gem && !gem.__error) {
+      result = gem;
+    } else {
+      // Gemini失敗 → 理由を表示してルールベースへ切替（②のご要望）
+      const reason = (gem && gem.__error) ? gem.__error : '不明なエラー';
+      addMessage('gm', `⚠️ Geminiでの評価に失敗しました（${reason}）。\n→ ルールベース採点に切り替えて続行します。`);
+      result = getDemoResult(text, state.currentStage);
+    }
+  } else {
+    await new Promise(r => setTimeout(r, 300));
+    result = getDemoResult(text, state.currentStage);
+  }
+
+  document.getElementById('loading').classList.remove('show');
+  state.waitingForResponse = false;
+  document.getElementById('send-btn').disabled = false;
+
+  if (!result || result.__error) {
+    addMessage('gm', '❌ 採点中に問題が発生しました。もう一度「詠唱」を押してください。');
+    return;
+  }
+
+  const TOTAL_STAGES = 7;
+  const isFinal = state.currentStage === TOTAL_STAGES;
+
+  // 現時点の点数スナップショット（4観点合計）
+  const snapshot = (result.score_clarity||0)+(result.score_conditions||0)+(result.score_persona||0)+(result.score_safety||0);
+
+  // ログ保存
+  state.stagePromptLogs.push({
+    stage: state.currentStage,
+    stageName: STAGES[state.currentStage-1].name,
+    prompt: text,
+    praise: result.praise,
+    feedback: result.feedback,
+    passed: isFinal ? true : result.passed,
+    tries: state.totalTries,
+    scoreSnapshot: snapshot
+  });
+
+  // 途中提出テキストを最新化
+  const mt = document.getElementById('midway-text');
+  if (mt) mt.value = buildSubmitText('midway');
+
+  if (isFinal) {
+    // ラスボスは6要素すべて揃わないと倒せない
+    if (result.bossDefeated) {
+      state.enemyHp = 0;
+      renderEnemyCard();
+      const total = (result.score_clarity||0)+(result.score_conditions||0)+(result.score_persona||0)+(result.score_safety||0);
+      addMessage('gm', `${result.story}\n\n⭐ ${result.praise}\n\n💡 ${result.feedback}`);
+      state.currentStage++; // クリア数カウント用
+      setTimeout(() => showFinalScore(result, total), 1400);
+    } else {
+      // 全要素未達 → ダメージは与えるが撃破せず、壁打ちで再挑戦を促す
+      const dmg = result.damage || 40;
+      state.enemyHp = Math.max(30, state.enemyHp - dmg); // 30未満にはしない（倒せたと誤認させない）
+      renderEnemyCard();
+      addMessage('gm', `${result.story}\n\n${result.praise}\n\n${result.feedback}`);
+    }
+    return;
+  }
+
+  // ダメージ処理
+  const dmg = result.damage || 40;
+  state.enemyHp = Math.max(0, state.enemyHp - dmg);
+  renderEnemyCard();
+
+  let msg = `${result.story}\n\n⭐ ${result.praise}`;
+  if (result.feedback) msg += `\n\n💡 ${result.feedback}`;
+
+  if (result.passed) {
+    state.enemyHp = 0;
+    renderEnemyCard();
+    const stage = STAGES[state.currentStage - 1];
+    msg += `\n\n🎉 ${stage.enemy}を倒した！\n\n${stage.rewardIcon} 巻物獲得：「${stage.reward}」\n🎒 下の「所持アイテム」からタップすると、このステージで学んだ“コツ”をいつでも読み返せるよ！（読むと試行回数+1）`;
+    state.inventory.push({ stage: stage.id, name: stage.reward, icon: stage.rewardIcon });
+    state.level++;
+    state.currentStage++;
+    addMessage('gm', msg);
+    updateInventory();
+
+    if (state.currentStage <= TOTAL_STAGES) {
+      document.getElementById('stat-level').textContent = state.level;
+      document.getElementById('stat-stage').textContent = `${state.currentStage}/${TOTAL_STAGES}`;
+      const next = STAGES[state.currentStage-1];
+      state.enemyHp = next.hp;
+      state.enemyMaxHp = next.hp;
+      document.getElementById('hint-text').textContent = curHint(state.currentStage);
+      renderStages();
+      renderEnemyCard();
+      const lead = (state.currentStage === TOTAL_STAGES)
+        ? `⬆️ レベルアップ！ レベル${state.level}に！\n\n⚠️ 最終決戦！ ステージ${state.currentStage}：${next.name} が現れた！\nこれまで学んだ6つの技術をすべて1つのプロンプトに込めて、カオス・ドラゴンを倒せ！`
+        : `⬆️ レベルアップ！ レベル${state.level}に！\n\nステージ${state.currentStage}：${next.name} が始まる！\n${next.enemy} が立ちふさがっている。新たな詠唱で立ち向かえ！`;
+      setTimeout(() => addMessage('gm', lead), 800);
+    }
+  } else {
+    addMessage('gm', msg + '\n\nもう一度挑戦しよう！ヒントを参考にプロンプトを改良してね 💪');
+  }
+}
+
+
+// =====================================================================
+// ===== ルールベース採点エンジン（志望理由書テーマ特化・APIキー不要） =====
+// =====================================================================
+// 4つの観点を多段階でスコアリングする：
+//   ①指示の明確さ（動詞）②条件・制約 ③役割設定 ④安全性
+// 各観点ごとに「何が良いか／何が足りないか」を具体的にフィードバックする。
+
+// --- プロンプトの要素を判定するヘルパー（進学/就職コース対応） ---
+function analyzePrompt(text, course) {
+  const t = text;
+
+  // ① 明確な指示（依頼の動詞）
+  const verbStrong = /(してください|説明してください|書いてください|添削してください|アドバイスしてください|提案してください|リストアップ|箇条書きにして|まとめてください|作成してください|改善してください|教えてください|挙げてください|考えてください|紹介してください|言い換えてください|作ってください|出してください)/.test(t);
+  const verbWeak   = /(教えて|書いて|して|お願い|ほしい|たい|ください)/.test(t);
+
+  // ②-A 条件・制約（個数・対象・入れたい語・テーマ限定など。文字数/形式は⑤で別途）
+  const condCount  = /(\d+\s*(つ|個|パターン|案|種類|通り))/.test(t);
+  const condTarget = /(向け|ターゲット|対象|新入生|高校生|女子高生|他校|お客さん|読者|初心者|小学生|友達)/.test(t);
+  const condWord   = /(という言葉|を入れて|を使って|オノマトペ|『.+?』を|「.+?」を入れ)/.test(t);
+  const condTheme  = /(模擬店|お化け屋敷|チュロス|文化祭|キャッチコピー|紹介文|感想文|だけ|に限定|のみ)/.test(t);
+  const condFlags  = [condCount, condTarget, condWord, condTheme].filter(Boolean).length;
+
+  // ②-B 振る舞いの制御（ルール指定：〜しないで／〜のように振る舞って）
+  const behaviorCtrl = /(教えないで|教えず|直接.{0,4}(言わない|教えない)|ヒントだけ|ヒントを出して|までは.{0,6}(教えない|言わない)|ように(振る舞|答え|話し)|ステップ(ごと|ずつ)|一問一答|質問して|聞いてください|逆に.{0,4}質問)/.test(t);
+
+  // ③ 役割設定（ペルソナ）
+  const personaStrong = /(あなたは.{0,16}(です|として)|キャリアアドバイザー|進路指導|入試の?専門家|採用担当|人事|面接官として|キャリアコンサルタント|プロの.{0,8}(です|として)|先生です|講師です|家庭教師|\d+年.{0,8}(経験|指導|担当))/.test(t);
+  const personaWeak   = /(あなたは|として|プロ|専門家|先生|講師|担当者)/.test(t);
+
+  // ④ 志望先の具体化（進学＝大学・学部・学科／就職＝業界・企業・職種）※ボス戦で使用
+  let targetStrong, targetWeak;
+  if (course === '就職') {
+    targetStrong = /(業界.{0,8}(の|で|を)?.{0,8}(職|営業|事務|技術|開発|販売|企画|総合職|エンジニア|プログラマ|デザイナ|介護|保育|看護|公務員)|[ァ-ヶ一-龠]+業界|[ァ-ヶ一-龠A-Za-z]+(株式会社|会社)|営業職|技術職|事務職|販売職|企画職|総合職|専門職)/.test(t);
+    targetWeak   = /(業界|企業|会社|職種|職|仕事|働く|就職)/.test(t);
+  } else {
+    targetStrong = /([ァ-ヶ一-龠A-Za-z]{2,}大学|[ァ-ヶ一-龠]{2,}学部|[ァ-ヶ一-龠]{2,}学科|専門学校|短大|〇〇大学|△△学部)/.test(t);
+    targetWeak   = /(大学|学部|学科|専門学校|短大|進学|志望校|志望先)/.test(t);
+  }
+
+  // ⑤ 自分の情報（経験・活動／性格・強み・弱み・魅力）
+  let selfStrong, selfWeak;
+  if (course === '就職') {
+    const selfFlags = [
+      /(強み|長所|得意)/.test(t),
+      /(弱み|短所|苦手|課題)/.test(t),
+      /(性格|人柄|タイプ|まじめ|粘り強|協調|リーダー|積極|慎重|努力|人見知り)/.test(t),
+      /(魅力|アピール|自己PR|セールスポイント)/.test(t),
+      /(経験|エピソード|部活|アルバイト|バイト|ボランティア|委員|資格|取り組|頑張|副キャプテン|キャプテン)/.test(t)
+    ].filter(Boolean).length;
+    selfStrong = selfFlags >= 2; selfWeak = selfFlags >= 1;
+  } else {
+    const selfFlags = [
+      /(部活|委員|生徒会|文化祭|体育祭|ボランティア|留学|資格|検定|バスケ|吹奏楽|サッカー|野球)/.test(t),
+      /(経験|エピソード|取り組|頑張|努力|活動|成果|学んだ|務め|副?キャプテン|部長|副部長)/.test(t),
+      /(私は|自分は|高校で|高校時代)/.test(t),
+      /(人見知り|長所|短所|強み|弱み|性格|まじめ|努力家|積極|慎重|協調|リーダー|得意|苦手)/.test(t)
+    ].filter(Boolean).length;
+    selfStrong = selfFlags >= 2; selfWeak = selfFlags >= 1;
+  }
+
+  // ⑥ 形式・文字数の指定
+  const fmtLength = /(\d+\s*字|\d+\s*文字|字以内|文字以内|文字程度|字程度)/.test(t);
+  const fmtStyle  = /(箇条書き|リスト|構成|序論|本論|結論|ですます|だ・である|です・ます|文体|段落|見出し|フォーマット|形式|表で)/.test(t);
+  const fmtStrong = fmtLength && fmtStyle;
+  const fmtWeak   = fmtLength || fmtStyle;
+
+  // ⑦ 安全性（個人情報・倫理）
+  const unsafePII    = /(田中太郎|山田花子|渋谷区|新宿区|在住|電話番号|住所|生年月日|マイナンバー|本名|実名|〇〇高校.{0,4}(在|の))/.test(t);
+  const cheatRaw = /(代わりに書いて|代筆|そのまま提出|丸写し|騙せる|騙す|でっち上げ|捏造|盛って|経歴を盛|嘘)/.test(t);
+  const cheatNegated = /(嘘.{0,6}(つかない|書かない|書きません|なし|ない|は書かない)|代筆.{0,4}(しない|ではなく)|そのまま.{0,4}(出さない|提出しない)|丸写し.{0,4}(しない|せず))/.test(t);
+  const unsafeCheat  = cheatRaw && !cheatNegated;
+  const unsafeAttack = /(中傷|貶|けなす|悪口)/.test(t);
+  const isUnsafe = unsafePII || unsafeCheat || unsafeAttack;
+  const safetyAware = /(個人情報.{0,6}(入れない|入れず|含めない|含めず|使わない|使わず|避けて|伏せ)|名前.{0,6}(伏せ|出さない|入れない|入れず)|匿名|倫理|嘘.{0,4}(つかない|なし|書かない)|正直|自分の言葉|そのまま(出さない|提出しない)|架空|仮の|仮名|ダミー)/.test(t);
+
+  const len = t.length;
+
+  return {
+    verbStrong, verbWeak,
+    condFlags, condCount, condTarget, condWord, condTheme, behaviorCtrl,
+    personaStrong, personaWeak,
+    targetStrong, targetWeak, selfStrong, selfWeak,
+    fmtStrong, fmtWeak, fmtLength, fmtStyle,
+    unsafePII, unsafeCheat, unsafeAttack, isUnsafe, safetyAware, len
+  };
+}
+
+// --- 6要素を0/部分/満点で点数化（合計100点に正規化） ---
+// 配点：①明確20 ②役割15 ③志望先15 ④自分20 ⑤形式15 ⑥安全15 = 100
+function scoreSix(a) {
+  const clarity = a.verbStrong ? (a.len >= 12 ? 20 : 16) : (a.verbWeak ? 11 : 4);
+  const persona = a.personaStrong ? 15 : (a.personaWeak ? 9 : 3);
+  const target  = a.targetStrong ? 15 : (a.targetWeak ? 9 : 3);
+  const self    = a.selfStrong ? 20 : (a.selfWeak ? 12 : 4);
+  const format  = a.fmtStrong ? 15 : (a.fmtWeak ? 9 : 3);
+  let safety;
+  if (a.isUnsafe) safety = 2;
+  else if (a.safetyAware) safety = 15;
+  else safety = 11;
+  return { clarity, persona, target, self, format, safety };
+}
+
+// 結果画面の4観点バー用にマッピング（合計100のまま表示）
+function toFourAxis(s) {
+  return {
+    score_clarity:    s.clarity + Math.round(s.format * 2/3),   // 明確さ＋形式の一部 → 30満点相当
+    score_conditions: s.target + Math.round(s.format * 1/3) + 8, // 志望先＋形式 → 30満点相当
+    score_persona:    s.persona + 5,                             // 役割 → 20満点相当
+    score_safety:     s.safety + 5                               // 安全 → 20満点相当
+  };
+}
+
+// =====================================================================
+// ===== Gemini評価（ハイブリッド）：失敗時はnullを返しルール採点へ =====
+// =====================================================================
+// 各ステージの「お題」と「学ぶ観点」をGeminiに伝え、点数とコメントをJSONで受け取る。
+// ボス戦の6要素必須チェックはルールベース(analyzePrompt)で担保し、整合性を守る。
+const STAGE_FOCUS = [
+  { name:'明確な指示', theme:'好きな食べ物の紹介文をAIに書いてもらう', point:'「〜してください」のように、してほしいことを動詞ではっきり指示できているか' },
+  { name:'条件・制約', theme:'文化祭の模擬店のキャッチコピーをAIに作らせる', point:'文字数・個数・対象・入れたい言葉など「条件」を足してAIの出力をコントロールできているか' },
+  { name:'役割と振る舞い', theme:'答えを直接教えずヒントで導く家庭教師をAIに演じさせる', point:'AIに役割（肩書き）を与え、かつ「答えを直接教えない」などの振る舞いのルールを指定できているか' },
+  { name:'情報を与える', theme:'自分の長所や経験をAIに伝えて魅力的に言い換えてもらう', point:'自分自身の具体的な経験・性格・強みなどの「材料」をAIに渡せているか' },
+  { name:'形式・文字数', theme:'部活動の紹介文を形を指定してAIに書かせる', point:'文字数・形式・文体など「出力の形」を指定できているか' },
+  { name:'AIリテラシー', theme:'危険なプロンプト（個人情報・代筆依頼）を安全な形に直す', point:'個人情報を入れず、代筆ではなく自分が書くための助言を求める安全な形になっているか' }
+];
+
+async function gradeWithGemini(text, stage, apiKey) {
+  const course = state.course || '進学';
+
+  // 事前チェック：AQ.形式のキーはGemini APIで認証できない（AIza形式が必要）
+  if (/^AQ\./.test(apiKey)) {
+    return { __error: 'このキーは「AQ.」形式で、Gemini APIでは使えません（AIza形式が必要。別のGoogleアカウントでキーを取得してください）' };
+  }
+
+  // ルールベース判定も併走（ボス戦の合否判定と、Gemini失敗時の保険に使う）
+  const a = analyzePrompt(text, course);
+  const four = toFourAxis(scoreSix(a));
+
+  let sys;
+  if (stage === 7) {
+    const goal = course === '就職' ? '就職の志望動機（ES）' : '大学・専門学校の志望理由書';
+    const tEx = course === '就職' ? '業界・企業・職種（例：IT業界の営業職）' : '大学・学部・学科（例：〇〇大学 経済学部）';
+    const sEx = course === '就職' ? '性格・強み・弱み・魅力・経験' : '高校での経験・活動・がんばったこと';
+    sys = `あなたは高校生向けのプロンプト学習RPGのゲームマスター兼採点者です。生徒は最終ボス戦で「${goal}」を完成させるための“1つのAIプロンプト”を書きます。
+次の6要素がすべて含まれているかを評価してください：
+①明確な指示（〜してください）②条件・制約 ③AIへの役割設定（あなたは〜です）④自分の情報（${sEx}）⑤志望先＋形式（${tEx}／文字数・構成）⑥安全配慮（本名や住所など個人情報を入れない・代筆や嘘をさせない）。
+親しみやすく前向きな口調で、できている点と足りない点を高校生にわかる言葉で具体的に伝えてください。`;
+  } else {
+    const f = STAGE_FOCUS[stage-1];
+    sys = `あなたは高校生向けのプロンプト学習RPGのゲームマスター兼採点者です。今はステージ${stage}「${f.name}」。
+生徒は次のお題でAIへのプロンプトを書きます：「${f.theme}」。
+評価の主な観点：${f.point}。
+親しみやすく前向きな口調で、できている点(praise)と、次にどう直すとより良くなるか(feedback)を、高校生にわかる言葉で具体的に伝えてください。壁打ち相手として、足りない要素に気づけるヒントを出してください。`;
+  }
+
+  const userMsg = `生徒が書いたプロンプト：「${text}」
+
+次のJSON形式だけで返答してください（前後に余計な文字を付けない）：
+{"praise":"できている点（30字程度）","feedback":"次への具体的アドバイス（60字程度）","clarity":0-30,"conditions":0-30,"persona":0-20,"safety":0-20,"passed":true/false}
+※clarity=指示と形式、conditions=条件と情報の具体性、persona=役割、safety=安全性。passedはこのステージの主観点を満たせたか。`;
+
+  try {
+    // gemini-2.5-flash を使用。503/429は1回だけ自動リトライ
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            system_instruction:{ parts:[{ text: sys }] },
+            contents:[{ role:'user', parts:[{ text: userMsg }] }],
+            generationConfig:{ temperature:0.4, maxOutputTokens:400 }
+          }) }
+      );
+      const data = await res.json();
+      if (data.error) {
+        if ((data.error.code === 503 || data.error.code === 429) && attempt === 0) {
+          await new Promise(r => setTimeout(r, 1000)); continue;
+        }
+        const c = data.error.code;
+        let label = `エラー${c||''}`;
+        if (c === 400) label = 'キーが無効（400）';
+        else if (c === 403) label = '権限エラー（403：API未有効化など）';
+        else if (c === 429) label = 'リクエスト上限（429）';
+        else if (c === 503) label = 'サーバー混雑（503）';
+        return { __error: label };
+      }
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!raw) return { __error: '応答が空でした' };
+      const clean = raw.replace(/```json|```/g, '').trim();
+      let g;
+      try { g = JSON.parse(clean); } catch(_) { return { __error: '応答の解析に失敗' }; }
+
+      // Geminiのスコア（なければルールベースで補完）
+      const score_clarity    = clampNum(g.clarity,    0, 30, four.score_clarity);
+      const score_conditions = clampNum(g.conditions, 0, 30, four.score_conditions);
+      const score_persona    = clampNum(g.persona,    0, 20, four.score_persona);
+      const score_safety     = clampNum(g.safety,     0, 20, four.score_safety);
+
+      if (stage === 7) {
+        // ボス戦の撃破可否はルールベースの6要素チェックで厳密に判定（Geminiの甘さを防ぐ）
+        const boss = bossCheck(a, course);
+        if (boss.defeated) {
+          return { score_clarity, score_conditions, score_persona, score_safety,
+            praise: g.praise || boss.praise, feedback: g.feedback || boss.feedback,
+            story:'6つの力が1つの詠唱に結集した！究極の光がカオス・ドラゴンを貫いた！', bossDefeated:true };
+        } else {
+          return { score_clarity, score_conditions, score_persona, score_safety,
+            praise: g.praise || boss.praise, feedback: boss.feedback,
+            story:'惜しい…！まだ足りない要素がある。全要素を込めて再挑戦だ！', bossDefeated:false };
+        }
+      }
+
+      const passed = (g.passed === true);
+      const damage = passed ? 100 : 55;
+      return { praise: g.praise || '挑戦できました！', feedback: g.feedback || 'もう少し具体的にしてみよう。',
+        passed, damage, score_clarity, score_conditions, score_persona, score_safety,
+        story: passed ? '言葉の光が敵を貫いた！大ダメージ！' : '詠唱が少し届かなかった…改良してみよう！' };
+    }
+    return { __error: 'リトライ後も応答なし' };
+  } catch(e) {
+    return { __error: '通信エラー（ネットワークまたはCORS）' };
+  }
+}
+
+function clampNum(v, lo, hi, fallback) {
+  const n = Number(v);
+  if (!isFinite(n)) return fallback;
+  return Math.max(lo, Math.min(hi, Math.round(n)));
+}
+
+// ボス戦の6要素チェック（ルールベース・厳密）
+function bossCheck(a, course) {
+  const checks = [
+    { ok: a.verbStrong,                     label:'①明確な指示（〜してください）' },
+    { ok: a.personaStrong || a.personaWeak, label:'②役割（あなたは〜です）' },
+    { ok: a.targetStrong,                   label:`③志望先（${course==='就職'?'業界・企業・職種':'大学・学部・学科'}）` },
+    { ok: a.selfStrong || a.selfWeak,       label:`④自分の情報（${course==='就職'?'性格・強み・弱み・魅力':'経験・活動'}）` },
+    { ok: a.fmtWeak,                        label:'⑤形式・文字数' },
+    { ok: !a.isUnsafe,                      label:'⑥安全配慮（個人情報・嘘なし）' }
+  ];
+  const missing = checks.filter(c => !c.ok);
+  const got = checks.filter(c => c.ok).map(c => c.label);
+  if (missing.length === 0) {
+    return { defeated:true, praise:`⭐ 6つの力がすべて揃いました！（${got.join('／')}）`,
+      feedback:'これがAIを使いこなすプロンプトの完成形です。お見事！' };
+  }
+  return { defeated:false, praise: got.length ? `ここまで揃っています：${got.join('／')}。` : 'プロンプトに挑戦できました。',
+    feedback:`⚠️ カオス・ドラゴンはまだ倒せない！ 足りない要素：${missing.map(m=>m.label).join('／')}。これらを1つのプロンプトに加えて、もう一度「詠唱」しよう！` };
+}
+
+// --- ステージごとの採点・壁打ちフィードバック（ルールベース） ---
+// stage: 1明確 2役割 3志望先 4自分 5形式 6安全 7総合(ラスボス)
+function getDemoResult(text, stage) {
+  const course = state.course || '進学';
+  const a = analyzePrompt(text, course);
+  const s = scoreSix(a);
+  const isFinal = stage === 7;
+
+  // 壁打ち用：コースに応じた具体例
+  const ex = course === '就職'
+    ? { target:'「IT業界の営業職」「〇〇株式会社の総合職」', self:'「強みは粘り強さ、弱みは慎重すぎる点」「部活で県大会に出た経験」', persona:'「あなたは採用担当10年の人事のプロです」', fmt:'「300字以内で」「ですます調で」' }
+    : { target:'「〇〇大学 経済学部 経営学科」', self:'「生徒会長として文化祭を改善した経験」「〇〇の資格」', persona:'「あなたは大学入試指導10年のキャリアアドバイザーです」', fmt:'「400字以内で」「序論・本論・結論の構成で」' };
+
+  // ===== ラスボス：6要素すべてが揃わないと倒せない =====
+  if (isFinal) {
+    const checks = [
+      { ok: a.verbStrong,                      label:'①明確な指示（〜してください）' },
+      { ok: a.personaStrong || a.personaWeak,  label:'②役割（あなたは〜です）' },
+      { ok: a.targetStrong,                    label:`③志望先（${course==='就職'?'業界・企業・職種':'大学・学部・学科'}）` },
+      { ok: a.selfStrong || a.selfWeak,        label:`④自分の情報（${course==='就職'?'性格・強み・弱み・魅力':'経験・活動'}）` },
+      { ok: a.fmtWeak,                         label:'⑤形式・文字数' },
+      { ok: !a.isUnsafe,                       label:'⑥安全配慮（個人情報・嘘なし）' }
+    ];
+    const missing = checks.filter(c => !c.ok);
+    const got = checks.filter(c => c.ok).map(c => c.label);
+
+    const four = toFourAxis(s);
+    const total = four.score_clarity + four.score_conditions + four.score_persona + four.score_safety;
+
+    if (missing.length === 0) {
+      const goalWord = course==='就職' ? '志望動機（ES）' : '志望理由書';
+      return {
+        ...four,
+        praise: `⭐ 6つの力がすべて揃った完璧なプロンプトです！（${got.join('／')}）`,
+        feedback: `これがAIを使いこなす${goalWord}プロンプトの完成形です。このままAIに送れば、質の高い下書きが得られます。お見事！`,
+        story: '6つの力が1つの詠唱に結集した！究極の光がカオス・ドラゴンを貫き、世界に平和が訪れた！',
+        bossDefeated: true
+      };
+    } else {
+      // 不足あり → まだ倒せない（壁打ちで何が足りないか指摘）
+      return {
+        ...four,
+        praise: got.length ? `ここまで揃っています：${got.join('／')}。` : 'プロンプトに挑戦できました。',
+        feedback: `⚠️ カオス・ドラゴンはまだ倒せない！ 足りない要素：${missing.map(m=>m.label).join('／')}。これらを1つのプロンプトに加えて、もう一度「詠唱」しよう！\n\n💡 例：${ex.persona}＋${ex.target}＋${ex.self}＋${ex.fmt}＋個人情報なし、をすべて1文にまとめよう。`,
+        story: '詠唱に足りない要素があり、ドラゴンの鱗を貫けなかった…！全要素を込めて再挑戦だ！',
+        bossDefeated: false
+      };
+    }
+  }
+
+  // ===== 通常ステージ：その回で学ぶ1要素にフォーカスして壁打ち =====
+  // S1明確 / S2条件 / S3役割と振る舞い / S4情報 / S5形式 / S6安全
+  let focus, focusMax, praise, feedback;
+
+  if (stage === 1) { // 明確な指示（お題：好きな食べ物の紹介文）
+    focus = s.clarity; focusMax = 20;
+    if (a.verbStrong) { praise='「〜してください」と明確な動詞で依頼できています！'; feedback='完璧な指示です。次は「条件」を足してAIを操る練習へ進もう！'; }
+    else if (a.verbWeak) { praise='AIに頼もうとできています。'; feedback='「〜について」だけで止めず、「紹介文を書いてください」「3つ挙げてください」のように、してほしいことを動詞ではっきり伝えよう！'; }
+    else { praise='プロンプトを書く一歩を踏み出せました。'; feedback='「〜してください」という依頼の言葉を必ず入れてみよう！（例：ラーメンの魅力を紹介してください）'; }
+  }
+  else if (stage === 2) { // 条件・制約（お題：模擬店キャッチコピー）
+    focus = condScore(a); focusMax = 20;
+    if (a.condFlags >= 2) { praise=`条件を${a.condFlags}個も足せています！AIの出力を上手にコントロールできています。`; feedback='この調子！条件が多いほど、思い通りのキャッチコピーになるよ。次は“役割”の練習へ！'; }
+    else if (a.condFlags === 1) { praise='条件を1つ足せています。'; feedback='💬 もっと注文をつけよう！「20字以内で」「3パターン」「他校の高校生向けに」「『ゾクッ』を入れて」など、条件を重ねるとAIを操れるよ。'; }
+    else { praise='依頼の形にはなっています。'; feedback='💬 まだ“おまかせ”の状態。条件を足そう！ 例：「お化け屋敷のキャッチコピーを、20字以内で、3パターン作ってください」のように、文字数・個数・対象・入れたい言葉などを指定しよう。'; }
+  }
+  else if (stage === 3) { // 役割と振る舞い（お題：答えを教えない家庭教師）
+    focus = behaviorScore(a); focusMax = 20;
+    const hasRole = a.personaStrong || a.personaWeak;
+    if (hasRole && a.behaviorCtrl) { praise='役割（肩書き）と、振る舞いのルールの両方を指定できています！これがAIを“別人”に変える上級テクニックです。'; feedback='お見事！次は“自分の情報”をAIに渡す練習へ進もう。'; }
+    else if (a.behaviorCtrl) { praise='AIの振る舞い（ルール）を指定できています！'; feedback='あと一歩。役割も与えよう。「あなたは優しい〇〇の先生です。答えは教えずヒントだけ出してください」のように。'; }
+    else if (hasRole) { praise='AIに役割（肩書き）を与えられています！'; feedback='💬 次は“振る舞いのルール”を足そう。「私が答えを言うまで、正解を直接教えずヒントだけ出してください」のように指示すると、AIの動きが変わるよ。'; }
+    else { praise='依頼内容は伝わります。'; feedback='💬 AIに役割と振る舞いを与えよう。「あなたは優しい数学の先生です。答えをすぐ教えず、ヒントで導いてください」のように書くと、家庭教師のように振る舞うよ。'; }
+  }
+  else if (stage === 4) { // 情報を与える（お題：長所の言い換え）
+    focus = s.self; focusMax = 20;
+    if (a.selfStrong) { praise='あなた自身の具体的な情報を渡せています！AIの答えが“あなた専用”になります。'; feedback='素晴らしい。次は“文字数や形式”を指定する練習へ進もう。'; }
+    else if (a.selfWeak) { praise='自分のことに触れられています。'; feedback='💬 もっと具体的に！ どんな経験？どんな性格？「人見知りだけど一度仲良くなると深く付き合える」のように、エピソードや具体例を添えるとAIが活き活き書けるよ。'; }
+    else { praise='依頼内容は伝わります。'; feedback='💬 ここが超重要！ AIはあなたを知らない。「自己PRを書いて」だけだと、ありきたりな文章しか出ない。あなたの経験・長所・短所などの“材料”を具体的に渡そう。'; }
+  }
+  else if (stage === 5) { // 形式・文字数（お題：部活紹介）
+    focus = s.format; focusMax = 15;
+    if (a.fmtStrong) { praise='文字数と形式の両方を指定できています！そのまま使える形に近づきます。'; feedback='完璧。最後は“安全に使うルール”を学ぼう。'; }
+    else if (a.fmtWeak) {
+      praise = a.fmtLength ? '文字数を指定できています。' : '形式・文体を指定できています。';
+      feedback = a.fmtLength ? '💬 あと一歩！ 文字数に加えて、形式や文体も指定しよう（例：「箇条書きで」「ですます調で」）。' : '💬 あと一歩！ 形式に加えて、文字数も指定しよう（例：「80字以内で」）。';
+    }
+    else { praise='依頼内容は伝わります。'; feedback='💬 出力の“形”を指定しよう。「吹奏楽部の紹介を、80字以内で、新入生向けに、ですます調で書いてください」のように、文字数・形式・文体を伝えると実用的になるよ。'; }
+  }
+  else { // stage 6 安全性（お題：危険プロンプトの修正）
+    focus = s.safety; focusMax = 15;
+    if (a.isUnsafe) {
+      praise='修正に取り組もうとしています。';
+      const probs = [];
+      if (a.unsafePII) probs.push('個人情報（氏名・住所・学校名など）');
+      if (a.unsafeCheat) probs.push('代筆・丸写しの依頼');
+      if (a.unsafeAttack) probs.push('他者を中傷する表現');
+      feedback = `💬 まだ危険な要素が残っているよ：${probs.join('／')}。これらを取り除き、“個人情報を入れず、自分が書くための助言を求める”形に直そう！`;
+    } else if (a.safetyAware) {
+      praise='個人情報や倫理面への配慮を明記できています！';
+      feedback='安全なプロンプトの見本のような書き方です。これで6つの力をすべて手に入れた。いよいよラスボス戦だ！';
+    } else {
+      praise='危険な要素のない安全なプロンプトに直せています！';
+      feedback='さらに「個人情報は入れない」「自分の言葉に直す」と明記すると完璧。いよいよラスボス戦だ！';
+    }
+  }
+
+  const ratio = focus / focusMax;
+  const passed = ratio >= 0.7 && !(stage === 6 && a.isUnsafe);
+  const damage = Math.round(35 + ratio * 65);
+  const four = toFourAxis(s);
+
+  return {
+    praise, feedback, passed, damage,
+    ...four,
+    story: passed ? '言葉の光が敵を貫いた！大ダメージ！' : '詠唱が少し届かなかった…壁打ちのヒントを見て改良しよう！'
+  };
+}
+
+// ステージ2（条件）用スコア：条件の数に応じて
+function condScore(a) {
+  if (a.condFlags >= 2) return 20;
+  if (a.condFlags === 1) return 12;
+  return 4;
+}
+// ステージ3（役割＋振る舞い）用スコア
+function behaviorScore(a) {
+  const hasRole = a.personaStrong || a.personaWeak;
+  if (hasRole && a.behaviorCtrl) return 20;
+  if (a.behaviorCtrl) return 15;        // 振る舞い指定はこのステージの主眼
+  if (a.personaStrong) return 13;
+  if (a.personaWeak) return 9;
+  return 4;
+}
+
+// ===== INVENTORY（巻物アイテム） =====
+function updateInventory() {
+  const list = document.getElementById('inventory-list');
+  if (!state.inventory.length) {
+    list.innerHTML = '<span style="font-size:13px;color:#888;">まだアイテムなし（魔物を倒すと“コツの巻物”が手に入る）</span>';
+    return;
+  }
+  list.innerHTML = state.inventory.map(it =>
+    `<button class="item-badge" onclick="useScroll(${it.stage})" title="タップでコツを読む（試行回数+1）">${it.icon} ${it.name}</button>`
+  ).join('');
+}
+
+// 巻物を使う＝コツを読む（試行回数ペナルティ+1）
+function useScroll(stageId) {
+  const st = STAGES[stageId-1];
+  if (!st) return;
+  // ペナルティ
+  state.totalTries++;
+  const tEl = document.getElementById('stat-tries');
+  if (tEl) tEl.textContent = state.totalTries;
+  // 途中提出テキストも更新
+  const mt = document.getElementById('midway-text');
+  if (mt) mt.value = buildSubmitText('midway');
+  // コツをチャットに表示
+  addMessage('gm', `${st.scroll}\n\n（📜 巻物を読んだので試行回数が +1 されました。ノーヒントでクリアするほど高評価だよ！）`);
+}
+
+// ===== FINAL SCORE =====
+function showFinalScore(result, total) {
+  state.finalResult = { ...result, total };
+  document.getElementById('screen-game').classList.remove('active');
+  document.getElementById('screen-score').classList.add('active');
+
+  document.getElementById('final-score').textContent = total;
+
+  // プレイヤー情報
+  const now = new Date();
+  const dtStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('print-class').textContent = state.playerClass;
+  document.getElementById('print-name').textContent = state.playerName + '（' + state.course + 'コース／' + state.playerClassType + '）';
+  document.getElementById('print-class-type').textContent = state.course + 'コース';
+  document.getElementById('print-datetime').textContent = dtStr;
+  document.getElementById('print-tries').textContent = state.totalTries + '回';
+  document.getElementById('print-stages').textContent = Math.min(state.currentStage - 1, 7) + ' / 7ステージ';
+
+  // スコア内訳
+  const scores = [
+    { label:'指示の明確さ・形式', score: result.score_clarity||0, max:30 },
+    { label:'条件・情報の具体性', score: result.score_conditions||0, max:30 },
+    { label:'役割・振る舞いの設定', score: result.score_persona||0, max:20 },
+    { label:'安全性・AIリテラシー', score: result.score_safety||0, max:20 }
+  ];
+  document.getElementById('score-breakdown').innerHTML = scores.map(s => {
+    const pct = Math.round(s.score / s.max * 100);
+    return `<div class="score-row">
+      <span style="min-width:140px;">${s.label}</span>
+      <div class="score-bar-bg"><div class="score-bar" style="width:${pct}%;"></div></div>
+      <span style="min-width:60px; text-align:right; color:#7F77DD; font-weight:600;">${s.score} / ${s.max}</span>
+    </div>`;
+  }).join('');
+
+  // エンディング
+  let icon, title, sub, story;
+  if (total >= 90)      { icon='👑'; title='伝説の魔法使い誕生！'; sub='完全制覇 — マスタープロンプター';            story=`${state.playerName}の究極の詠唱がカオス・ドラゴンを完全撃破！世界に平和が訪れ、その名は永遠に語り継がれる伝説となった。`; }
+  else if (total >= 70) { icon='⭐'; title='勝利！勇者の証';       sub='ドラゴン撃破 — 立派な魔法使いだ！';        story=`${state.playerName}の渾身のプロンプトがカオス・ドラゴンに深手を負わせ、ついに撃破に成功！世界中の人々が歓喜の声をあげた。`; }
+  else if (total >= 50) { icon='🛡️'; title='健闘賞！';            sub='ドラゴンを撤退させた — もう少し！';         story=`${state.playerName}はカオス・ドラゴンに傷を負わせ、撤退させることに成功。次の挑戦ではさらに強力な詠唱でとどめを刺そう！`; }
+  else                  { icon='📚'; title='修行の途中…';          sub='次の挑戦でレベルアップを目指せ！';           story=`今回は力及ばなかった。しかし${state.playerName}は多くを学んだ。再び剣を磨き、カオス・ドラゴンに挑め！`; }
+
+  document.getElementById('ending-icon').textContent = icon;
+  document.getElementById('ending-title').textContent = title;
+  document.getElementById('ending-sub').textContent = sub;
+  document.getElementById('ending-story').textContent = story;
+
+  // プロンプトログ表示
+  const logHtml = state.stagePromptLogs.map((log, i) => `
+    <div style="margin-bottom:1rem; padding:0.75rem; background:#faf9f6; border-radius:8px; border:1px solid #e5e2d9;">
+      <div style="font-weight:600; margin-bottom:4px;">ステージ${log.stage}：${log.stageName} ${log.passed ? '✓ クリア' : '未クリア'}</div>
+      <div style="margin-bottom:4px;"><span style="color:#888;">詠唱：</span>${escapeHtml(log.prompt)}</div>
+      <div style="color:#1D9E75;">⭐ ${log.praise}</div>
+      <div style="color:#888;">💡 ${log.feedback}</div>
+    </div>
+  `).join('');
+  document.getElementById('stage-log-content').innerHTML = logHtml || '<p style="color:#888;">ログなし</p>';
+
+  // 提出用テキストを自動生成してテキストエリアにセット
+  fillSubmitText();
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ===== 提出用テキストの生成（組席・名前・コース・点数・プロンプト履歴） =====
+// mode: 'final'（クリア時）または 'midway'（途中）
+function buildSubmitText(mode) {
+  const dt = new Date().toLocaleString('ja-JP');
+
+  // 点数：クリア済みならfinalResultの合計、途中なら直近の採点結果から推定
+  let total, statusLabel;
+  if (mode === 'final' && state.finalResult) {
+    const r = state.finalResult;
+    total = r.total || 0;
+    statusLabel = 'クリア（カオス・ドラゴン撃破）';
+  } else {
+    // 途中：最後に採点された結果の4観点合計を現在の点数とする
+    const logs = state.stagePromptLogs;
+    const last = logs.length ? logs[logs.length-1] : null;
+    if (last && last.scoreSnapshot) {
+      total = last.scoreSnapshot;
+    } else {
+      total = 0;
+    }
+    const cleared = Math.min(state.currentStage - 1, 7);
+    statusLabel = `途中提出（${cleared} / 7ステージ クリア）`;
+  }
+
+  // 各ステージの全プロンプト履歴（試行回数すべて）
+  const stageNames = ['①明確な指示', '②条件・制約', '③役割と振る舞い', '④情報を与える', '⑤形式・文字数', '⑥AIリテラシー', '⑦最終課題（志望理由書・総合）'];
+  const historyLines = [1,2,3,4,5,6,7].map(n => {
+    const logs = state.stagePromptLogs.filter(l => l.stage === n);
+    if (!logs.length) return `【S${n} ${stageNames[n-1]}】（未挑戦）`;
+    const body = logs.map((l, i) => `  試行${i+1}: ${l.prompt}`).join('\n');
+    return `【S${n} ${stageNames[n-1]}】\n${body}`;
+  }).join('\n');
+
+  return [
+    `■組席：${state.playerClass}`,
+    `■なまえ：${state.playerName}`,
+    `■コース：${state.course}`,
+    `■採点：${getGeminiKey() ? 'Gemini評価' : 'ルール採点'}`,
+    `■状態：${statusLabel}`,
+    `■点数：${total} / 100点`,
+    `■提出日時：${dt}`,
+    ``,
+    `■プロンプト履歴：`,
+    historyLines
+  ].join('\n');
+}
+
+// 結果画面表示時に提出テキストを自動セット
+function fillSubmitText() {
+  const ta = document.getElementById('submit-text');
+  if (ta) ta.value = buildSubmitText('final');
+}
+
+// 各UIに対応するDOM IDを返す
+function submitEls(mode) {
+  if (mode === 'midway') {
+    return { ta:'midway-text', copyBtn:'midway-copy-btn', status:'midway-status', m:'midway' };
+  }
+  return { ta:'submit-text', copyBtn:'copy-btn', status:'sheet-status', m:'final' };
+}
+
+// ===== ①結果をコピー =====
+async function copyResult(mode) {
+  const e = submitEls(mode);
+  const ta = document.getElementById(e.ta);
+  // 常に最新の状態でテキストを作り直す（途中提出は刻々と変わるため）
+  ta.value = buildSubmitText(e.m);
+  const btn = document.getElementById(e.copyBtn);
+  try {
+    await navigator.clipboard.writeText(ta.value);
+    showStatus(e.status, '✅ コピーしました！「②Googleフォームを開く」で貼り付けて提出してください。', 'success');
+    btn.textContent = '✅ コピー完了';
+    setTimeout(() => { btn.textContent = '📋 ①結果をコピー'; }, 2500);
+  } catch(err) {
+    ta.focus();
+    ta.select();
+    showStatus(e.status, '上のテキストを選択しました。Ctrl+C（スマホは長押し→コピー）でコピーしてください。', 'success');
+  }
+}
+
+// ===== ②Googleフォームを開く =====
+function openForm(mode) {
+  const e = submitEls(mode);
+  const url = getFormUrl();
+  if (!url) {
+    showStatus(e.status, 'GoogleフォームのURLが設定されていません。先生に確認してください（画面上部の設定欄）。', 'error');
+    return;
+  }
+  window.open(url, '_blank');
+  showStatus(e.status, '📝 別タブでGoogleフォームを開きました。回答欄に貼り付け（Ctrl+V）して送信してください。', 'success');
+}
+
+// ステータスメッセージ表示（ID指定）
+function showStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'status-msg show ' + type;
+}
+// 後方互換（結果画面用）
+function showSheetStatus(msg, type) { showStatus('sheet-status', msg, type); }
+
+// ===== RESTART =====
+function restartGame() {
+  state = {
+    playerName:'', playerClass:'', playerClassIcon:'🧙', playerClassType:'魔法使い',
+    course:'進学', courseIcon:'🎓',
+    currentStage:1, level:1, inventory:[], totalTries:0,
+    enemyHp:100, enemyMaxHp:100,
+    stagePromptLogs:[], waitingForResponse:false, finalResult:null
+  };
+  document.getElementById('screen-score').classList.remove('active');
+  document.getElementById('screen-game').classList.remove('active');
+  document.getElementById('screen-welcome').classList.add('active');
+  document.getElementById('player-name-input').value = '';
+  document.getElementById('player-class-input').value = '';
+  document.getElementById('chat-area').innerHTML = '';
+  document.getElementById('inventory-list').innerHTML = '<span style="font-size:13px;color:#888;">まだアイテムなし</span>';
+  document.getElementById('sheet-status').className = 'status-msg';
+  const st = document.getElementById('submit-text'); if (st) st.value = '';
+  const mt = document.getElementById('midway-text'); if (mt) mt.value = '';
+  const ms = document.getElementById('midway-status'); if (ms) ms.className = 'status-msg';
+  document.querySelectorAll('.class-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector('.class-btn[data-course="進学"]').classList.add('selected');
+  document.querySelector('.class-btn[data-class="魔法使い"]').classList.add('selected');
+}
+
+// ===== KEYBOARD =====
+document.addEventListener('DOMContentLoaded', () => {
+  loadConfig();
+  document.getElementById('player-name-input').addEventListener('keydown', e => { if (e.key==='Enter') startAdventure(); });
+  document.getElementById('prompt-input').addEventListener('keydown', e => {
+    if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+});
+</script>
+
+</body>
+</html>
